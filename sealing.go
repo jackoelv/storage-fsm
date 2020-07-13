@@ -106,7 +106,7 @@ func (m *Sealing) AllocatePiece(size abi.UnpaddedPieceSize) (sectorID abi.Sector
 }
 
 func (m *Sealing) SealPiece(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, sectorID abi.SectorNumber, d DealInfo) error {
-	log.Infof("Seal piece for deal %d", d.DealID)
+	log.Infof("jackoelvAddpiecetest:storage-fsm/sealing.go:Seal piece for deal %d", d.DealID)
 
 	ppi, err := m.sealer.AddPiece(sectorstorage.WithPriority(ctx, DealSectorPriority), m.minerSector(sectorID), []abi.UnpaddedPieceSize{}, size, r)
 	if err != nil {
@@ -130,7 +130,7 @@ func (m *Sealing) SealPiece(ctx context.Context, size abi.UnpaddedPieceSize, r i
 // them (in the event of a storage deal) or no deal (in the event of sealing
 // garbage data)
 func (m *Sealing) newSector(sid abi.SectorNumber, rt abi.RegisteredSealProof, pieces []Piece) error {
-	log.Infof("Start sealing %d", sid)
+	log.Infof("jackoelvAddpiecetest:storage-fsm/sealing.go:Start sealing %d", sid)
 	return m.sectors.Send(uint64(sid), SectorStart{
 		ID:         sid,
 		Pieces:     pieces,

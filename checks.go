@@ -34,8 +34,12 @@ type ErrNoPrecommit struct{ error }
 func checkPieces(ctx context.Context, si SectorInfo, api SealingAPI) error {
 	tok, height, err := api.ChainHead(ctx)
 	if err != nil {
+		log.Infow("jackoelvAddpiecetest:storage-fsm/checks.go:api.ChainHead err", err)
 		return &ErrApi{xerrors.Errorf("getting chain head: %w", err)}
 	}
+	
+	log.Infow("jackoelvAddpiecetest:storage-fsm/checks.go:si", si)
+
 
 	for i, p := range si.Pieces {
 		// if no deal is associated with the piece, ensure that we added it as
@@ -43,6 +47,7 @@ func checkPieces(ctx context.Context, si SectorInfo, api SealingAPI) error {
 		if p.DealInfo == nil {
 			exp := zerocomm.ZeroPieceCommitment(p.Piece.Size.Unpadded())
 			if !p.Piece.PieceCID.Equals(exp) {
+				log.Infow("jackoelvAddpiecetest:storage-fsm/checks.go:p.DealInfo nil and !p.Piece.PieceCID.Equals(exp) return false")
 				return &ErrInvalidPiece{xerrors.Errorf("sector %d piece %d had non-zero PieceCID %+v", si.SectorNumber, i, p.Piece.PieceCID)}
 			}
 			continue
@@ -50,18 +55,22 @@ func checkPieces(ctx context.Context, si SectorInfo, api SealingAPI) error {
 
 		proposal, err := api.StateMarketStorageDeal(ctx, p.DealInfo.DealID, tok)
 		if err != nil {
+			log.Infow("jackoelvAddpiecetest:storage-fsm/checks.go:api.StateMarketStorageDeal err", err)
 			return &ErrApi{xerrors.Errorf("getting deal %d for piece %d: %w", p.DealInfo.DealID, i, err)}
 		}
 
 		if proposal.PieceCID != p.Piece.PieceCID {
+			log.Infow("jackoelvAddpiecetest:storage-fsm/checks.go:proposal.PieceCID != p.Piece.PieceCID", err)
 			return &ErrInvalidDeals{xerrors.Errorf("piece %d (of %d) of sector %d refers deal %d with wrong PieceCID: %x != %x", i, len(si.Pieces), si.SectorNumber, p.DealInfo.DealID, p.Piece.PieceCID, proposal.PieceCID)}
 		}
 
 		if p.Piece.Size != proposal.PieceSize {
+			log.Infow("jackoelvAddpiecetest:storage-fsm/checks.go:p.Piece.Size != proposal.PieceSize", err)
 			return &ErrInvalidDeals{xerrors.Errorf("piece %d (of %d) of sector %d refers deal %d with different size: %d != %d", i, len(si.Pieces), si.SectorNumber, p.DealInfo.DealID, p.Piece.Size, proposal.PieceSize)}
 		}
 
 		if height >= proposal.StartEpoch {
+			log.Infow("jackoelvAddpiecetest:storage-fsm/checks.go:height >= proposal.StartEpoch", err)
 			return &ErrExpiredDeals{xerrors.Errorf("piece %d (of %d) of sector %d refers expired deal %d - should start at %d, head %d", i, len(si.Pieces), si.SectorNumber, p.DealInfo.DealID, proposal.StartEpoch, height)}
 		}
 	}

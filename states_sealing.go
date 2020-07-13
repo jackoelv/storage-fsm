@@ -18,7 +18,7 @@ import (
 var DealSectorPriority = 1024
 
 func (m *Sealing) handlePacking(ctx statemachine.Context, sector SectorInfo) error {
-	log.Infow("performing filling up rest of the sector...", "sector", sector.SectorNumber)
+	log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:performing filling up rest of the sector...", "sector", sector.SectorNumber)
 
 	var allocated abi.UnpaddedPieceSize
 	for _, piece := range sector.Pieces {
@@ -40,15 +40,18 @@ func (m *Sealing) handlePacking(ctx statemachine.Context, sector SectorInfo) err
 		log.Warnf("Creating %d filler pieces for sector %d", len(fillerSizes), sector.SectorNumber)
 	}
 
+	log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:handlePacking:m.pledgeSector", "sector", sector.SectorNumber)
 	fillerPieces, err := m.pledgeSector(ctx.Context(), m.minerSector(sector.SectorNumber), sector.existingPieceSizes(), fillerSizes...)
 	if err != nil {
 		return xerrors.Errorf("filling up the sector (%v): %w", fillerSizes, err)
 	}
+	log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:handlePacking:after m.pledgeSector return", "sector", sector.SectorNumber, fillerPieces)
 
 	return ctx.Send(SectorPacked{FillerPieces: fillerPieces})
 }
 
 func (m *Sealing) getTicket(ctx statemachine.Context, sector SectorInfo) (abi.SealRandomness, abi.ChainEpoch, error) {
+	log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:getTicket", sector.SectorNumber)
 	tok, epoch, err := m.api.ChainHead(ctx.Context())
 	if err != nil {
 		log.Errorf("handlePreCommit1: api error, not proceeding: %+v", err)
@@ -79,21 +82,29 @@ func (m *Sealing) getTicket(ctx statemachine.Context, sector SectorInfo) (abi.Se
 }
 
 func (m *Sealing) handlePreCommit1(ctx statemachine.Context, sector SectorInfo) error {
+	log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:handlePreCommit1", sector.SectorNumber)
+	log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:sector SectorInfo", sector)
+
 	if err := checkPieces(ctx.Context(), sector, m.api); err != nil { // Sanity check state
+		log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:sector checkPieces err:", err)
 		switch err.(type) {
 		case *ErrApi:
+			log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:sector checkPieces ErrApi:", err)
 			log.Errorf("handlePreCommit1: api error, not proceeding: %+v", err)
 			return nil
 		case *ErrInvalidDeals:
+			log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:sector checkPieces ErrInvalidDeals:", err)
 			return ctx.Send(SectorPackingFailed{xerrors.Errorf("invalid dealIDs in sector: %w", err)})
 		case *ErrExpiredDeals: // Probably not much we can do here, maybe re-pack the sector?
+			log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:sector checkPieces ErrExpiredDeals:", err)
 			return ctx.Send(SectorPackingFailed{xerrors.Errorf("expired dealIDs in sector: %w", err)})
 		default:
+			log.Infow("jackoelvAddpiecetest:storage-fsm/states_sealing.go:sector checkPieces default:", err)
 			return xerrors.Errorf("checkPieces sanity check error: %w", err)
 		}
 	}
 
-	log.Infow("performing sector replication...", "sector", sector.SectorNumber)
+	log.Infow("jackoelvAddpiecetest:performing sector replication...", "sector", sector.SectorNumber)
 	ticketValue, ticketEpoch, err := m.getTicket(ctx, sector)
 	if err != nil {
 		return ctx.Send(SectorSealPreCommit1Failed{xerrors.Errorf("getting ticket failed: %w", err)})
