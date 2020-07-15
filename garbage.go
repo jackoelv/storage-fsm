@@ -17,7 +17,6 @@ func (m *Sealing) pledgeReader(size abi.UnpaddedPieceSize) io.Reader {
 }
 
 func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, sizes ...abi.UnpaddedPieceSize) ([]abi.PieceInfo, error) {
-	log.Warnf("jackoelvAddpiecetest:storage-fsm/garbage.go pledgeSector")
 	if len(sizes) == 0 {
 		return nil, nil
 	}
@@ -26,7 +25,6 @@ func (m *Sealing) pledgeSector(ctx context.Context, sectorID abi.SectorID, exist
 
 	out := make([]abi.PieceInfo, len(sizes))
 	for i, size := range sizes {
-		log.Warnf("jackoelvAddpiecetest:storage-fsm/garbage.go for sizes m.sealer.AddPiece, i:%d",i)
 		ppi, err := m.sealer.AddPiece(ctx, sectorID, existingPieceSizes, size, m.pledgeReader(size))
 		if err != nil {
 			return nil, xerrors.Errorf("add piece: %w", err)
@@ -45,8 +43,6 @@ func (m *Sealing) PledgeSector() error {
 		ctx := context.TODO() // we can't use the context from command which invokes
 		// this, as we run everything here async, and it's cancelled when the
 		// command exits
-		log.Warnf("jackoelvAddpiecetest:storage-fsm/garbage.go PledgeSector")
-
 		size := abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded()
 
 		rt, err := ffiwrapper.SealProofTypeFromSectorSize(m.sealer.SectorSize())
@@ -60,14 +56,12 @@ func (m *Sealing) PledgeSector() error {
 			log.Errorf("%+v", err)
 			return
 		}
-		log.Warnf("jackoelvAddpiecetest:storage-fsm/garbage.go m.sealer.NewSector")
 		err = m.sealer.NewSector(ctx, m.minerSector(sid))
 		if err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
 
-		log.Warnf("jackoelvAddpiecetest:storage-fsm/garbage.go m.pledgeSector")
 		pieces, err := m.pledgeSector(ctx, m.minerSector(sid), []abi.UnpaddedPieceSize{}, size)
 		if err != nil {
 			log.Errorf("%+v", err)
@@ -82,12 +76,10 @@ func (m *Sealing) PledgeSector() error {
 			}
 		}
 
-		log.Warnf("jackoelvAddpiecetest:storage-fsm/garbage.go m.newSector")
 		if err := m.newSector(sid, rt, ps); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
-		log.Warnf("jackoelvAddpiecetest:storage-fsm/garbage.go after m.newSector")
 
 	}()
 	return nil
