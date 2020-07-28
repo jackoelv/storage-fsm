@@ -32,3 +32,7 @@ require (
 replace github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.18.0
 
 replace github.com/filecoin-project/filecoin-ffi => ../lotus/extern/filecoin-ffi
+
+replace github.com/filecoin-project/sector-storage => ../sector-storage
+
+replace github.com/filecoin-project/specs-storage => ../specs-storage
