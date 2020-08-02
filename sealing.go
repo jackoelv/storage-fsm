@@ -42,6 +42,7 @@ type SealingAPI interface {
 	StateMinerSectorSize(context.Context, address.Address, TipSetToken) (abi.SectorSize, error)
 	StateMinerWorkerAddress(ctx context.Context, maddr address.Address, tok TipSetToken) (address.Address, error)
 	StateMinerDeadlines(ctx context.Context, maddr address.Address, tok TipSetToken) ([]*miner.Deadline, error)
+	StateMinerPreCommitDepositForPower(context.Context, address.Address, miner.SectorPreCommitInfo, TipSetToken) (big.Int, error)
 	StateMinerInitialPledgeCollateral(context.Context, address.Address, miner.SectorPreCommitInfo, TipSetToken) (big.Int, error)
 	StateMarketStorageDeal(context.Context, abi.DealID, TipSetToken) (market.DealProposal, error)
 	SendMsg(ctx context.Context, from, to address.Address, method abi.MethodNum, value, gasPrice big.Int, gasLimit int64, params []byte) (cid.Cid, error)
@@ -78,7 +79,7 @@ type UnsealedSectorMap struct {
 type UnsealedSectorInfo struct {
 	numDeals uint64
 	// stored should always equal sum of pieceSizes.Padded()
-	stored     uint64
+	stored     abi.PaddedPieceSize
 	pieceSizes []abi.UnpaddedPieceSize
 }
 
@@ -118,13 +119,13 @@ func (m *Sealing) Run(ctx context.Context) error {
 func (m *Sealing) Stop(ctx context.Context) error {
 	return m.sectors.Stop(ctx)
 }
-func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d DealInfo) (abi.SectorNumber, uint64, error) {
+func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d DealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 	log.Infof("Adding piece for deal %d", d.DealID)
 	if (padreader.PaddedSize(uint64(size))) != size {
 		return 0, 0, xerrors.Errorf("cannot allocate unpadded piece")
 	}
 
-	if size > abi.UnpaddedPieceSize(m.sealer.SectorSize()) {
+	if size > abi.PaddedPieceSize(m.sealer.SectorSize()).Unpadded() {
 		return 0, 0, xerrors.Errorf("piece cannot fit into a sector")
 	}
 
@@ -154,7 +155,9 @@ func (m *Sealing) AddPieceToAnySector(ctx context.Context, size abi.UnpaddedPiec
 
 	m.unsealedInfoMap.mux.Unlock()
 	if m.unsealedInfoMap.infos[sid].numDeals == getDealPerSectorLimit(m.sealer.SectorSize()) {
-		m.StartPacking(sid)
+		if err := m.StartPacking(sid); err != nil {
+			return 0, 0, xerrors.Errorf("start packing: %w", err)
+		}
 	}
 
 	return sid, offset, nil
@@ -184,7 +187,7 @@ func (m *Sealing) addPiece(ctx context.Context, sectorID abi.SectorNumber, size 
 	}
 	m.unsealedInfoMap.infos[sectorID] = UnsealedSectorInfo{
 		numDeals:   num,
-		stored:     ui.stored + uint64(piece.Piece.Size),
+		stored:     ui.stored + piece.Piece.Size,
 		pieceSizes: append(ui.pieceSizes, piece.Piece.Size.Unpadded()),
 	}
 
@@ -212,10 +215,10 @@ func (m *Sealing) StartPacking(sectorID abi.SectorNumber) error {
 
 // Caller should hold m.unsealedInfoMap.mux
 func (m *Sealing) getSectorAndPadding(size abi.UnpaddedPieceSize) (abi.SectorNumber, []abi.PaddedPieceSize, error) {
-	ss := m.sealer.SectorSize()
+	ss := abi.PaddedPieceSize(m.sealer.SectorSize())
 	for k, v := range m.unsealedInfoMap.infos {
-		pads, padLength := ffiwrapper.GetRequiredPadding(abi.PaddedPieceSize(v.stored), size.Padded())
-		if v.stored+uint64(size)+uint64(padLength) <= uint64(ss) {
+		pads, padLength := ffiwrapper.GetRequiredPadding(v.stored, size.Padded())
+		if v.stored+size.Padded()+padLength <= ss {
 			return k, pads, nil
 		}
 	}

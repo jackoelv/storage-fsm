@@ -40,7 +40,7 @@ func (m *Sealing) handlePacking(ctx statemachine.Context, sector SectorInfo) err
 		log.Warnf("Creating %d filler pieces for sector %d", len(fillerSizes), sector.SectorNumber)
 	}
 
-	fillerPieces, err := m.pledgeSector(ctx.Context(), m.minerSector(sector.SectorNumber), sector.existingPieceSizes(), fillerSizes...)
+	fillerPieces, err := m.pledgeSector(sector.sealingCtx(ctx.Context()), m.minerSector(sector.SectorNumber), sector.existingPieceSizes(), fillerSizes...)
 	if err != nil {
 		return xerrors.Errorf("filling up the sector (%v): %w", fillerSizes, err)
 	}
@@ -176,7 +176,7 @@ func (m *Sealing) handlePreCommitting(ctx statemachine.Context, sector SectorInf
 		return ctx.Send(SectorChainPreCommitFailed{xerrors.Errorf("could not serialize pre-commit sector parameters: %w", err)})
 	}
 
-	collateral, err := m.api.StateMinerInitialPledgeCollateral(ctx.Context(), m.maddr, *params, tok)
+	collateral, err := m.api.StateMinerPreCommitDepositForPower(ctx.Context(), m.maddr, *params, tok)
 	if err != nil {
 		return xerrors.Errorf("getting initial pledge collateral: %w", err)
 	}
